@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diffusion Limited Aggregation Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #canvas {
+            flex: 1;
+            background: #0a0e27;
+            cursor: crosshair;
+            display: block;
+        }
+
+        #controls {
+            background: rgba(30, 60, 114, 0.95);
+            padding: 15px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+
+        label {
+            color: #a8d8ff;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="range"] {
+            width: 150px;
+            height: 6px;
+            border-radius: 3px;
+            background: #2a5298;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4dd0e1;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(77, 208, 225, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4dd0e1;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(77, 208, 225, 0.5);
+        }
+
+        .value-display {
+            color: #4dd0e1;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Spawn mode toggle */
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+
+        .toggle-buttons {
+            display: flex;
+            background: #2a5298;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .toggle-buttons button {
+            flex: 1;
+            background: transparent;
+            color: #a8d8ff;
+            border: none;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: none;
+        }
+
+        .toggle-buttons button.active {
+            background: #4dd0e1;
+            color: #0a0e27;
+        }
+
+        .toggle-buttons button:hover:not(.active) {
+            background: rgba(77, 208, 225, 0.2);
+        }
+
+        button {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #pauseBtn {
+            background: linear-gradient(135deg, #ffa726, #ff9800);
+            box-shadow: 0 4px 15px rgba(255, 167, 38, 0.4);
+        }
+
+        #pauseBtn:hover {
+            box-shadow: 0 6px 20px rgba(255, 167, 38, 0.6);
+        }
+
+        #pauseBtn.paused {
+            background: linear-gradient(135deg, #66bb6a, #4caf50);
+        }
+
+        #calcDimBtn {
+            background: linear-gradient(135deg, #ab47bc, #9c27b0);
+            box-shadow: 0 4px 15px rgba(171, 71, 188, 0.4);
+        }
+
+        #calcDimBtn:hover {
+            box-shadow: 0 6px 20px rgba(171, 71, 188, 0.6);
+        }
+
+        #calcDimBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #stats {
+            color: #a8d8ff;
+            font-size: 11px;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 60, 114, 0.9);
+            color: #a8d8ff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            text-align: center;
+            pointer-events: none;
+            animation: fadeIn 0.5s ease;
+            max-width: 90%;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Modal styles */
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modal-overlay.active {
+            display: flex;
+        }
+
+        #modal {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+        }
+
+        #modal h2 {
+            color: #ff6b9d;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        #modal p {
+            color: #a8d8ff;
+            margin-bottom: 25px;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        #modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        #modal button {
+            background: linear-gradient(135deg, #4dd0e1, #26c6da);
+            padding: 12px 24px;
+            box-shadow: 0 4px 15px rgba(77, 208, 225, 0.4);
+        }
+
+        #modal button:hover {
+            box-shadow: 0 6px 20px rgba(77, 208, 225, 0.6);
+        }
+
+        #modal button.secondary {
+            background: linear-gradient(135deg, #666, #555);
+            box-shadow: 0 4px 15px rgba(100, 100, 100, 0.4);
+        }
+
+        .relocate-mode {
+            cursor: move !important;
+        }
+
+        #relocate-hint {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(77, 208, 225, 0.95);
+            color: #0a0e27;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 999;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        /* Dimension modal */
+        #dimension-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: flex-end;
+            align-items: stretch;
+            padding: 20px;
+        }
+
+        #dimension-modal-overlay.active {
+            display: flex !important;
+        }
+
+        #dimension-modal {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            width: 350px;
+            max-height: 100%;
+            overflow-y: auto;
+            text-align: center;
+        }
+
+        #dimension-modal h2 {
+            color: #ab47bc;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        #dimension-results {
+            color: #a8d8ff;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            font-size: 12px;
+        }
+
+        #dimension-results strong {
+            color: #4dd0e1;
+        }
+
+        #dimension-plot {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        #prev-box-btn, #next-box-btn, #toggle-boxes-btn {
+            background: linear-gradient(135deg, #ab47bc, #9c27b0);
+            box-shadow: 0 4px 15px rgba(171, 71, 188, 0.4);
+            padding: 8px 12px;
+            font-size: 11px;
+        }
+
+        #prev-box-btn:hover, #next-box-btn:hover, #toggle-boxes-btn:hover {
+            box-shadow: 0 6px 20px rgba(171, 71, 188, 0.6);
+        }
+
+        @media (max-width: 600px) {
+            #dimension-modal-overlay {
+                justify-content: center;
+                padding: 10px;
+            }
+
+            #dimension-modal {
+                width: 100%;
+                max-width: 350px;
+            }
+
+            #controls {
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .control-group {
+                min-width: 120px;
+            }
+
+            input[type="range"] {
+                width: 120px;
+            }
+
+            button {
+                padding: 10px 16px;
+                font-size: 12px;
+            }
+
+            #instructions {
+                font-size: 11px;
+                padding: 8px 15px;
+            }
+
+            #modal {
+                padding: 20px;
+            }
+
+            #modal h2 {
+                font-size: 20px;
+            }
+
+            #modal p {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        <div id="controls">
+            <div class="toggle-group">
+                <label>Spawn Mode</label>
+                <div class="toggle-buttons">
+                    <button id="spawnCenter" class="active">Center</button>
+                    <button id="spawnEdge">Edge</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="speed">Particle Speed</label>
+                <input type="range" id="speed" min="0.5" max="10" step="0.5" value="2">
+                <div class="value-display" id="speedValue">2.0x</div>
+            </div>
+            <div class="control-group">
+                <label for="spawnRate">Spawn Rate</label>
+                <input type="range" id="spawnRate" min="0" max="100" step="1" value="20">
+                <div class="value-display" id="spawnRateValue">5/sec</div>
+            </div>
+            <button id="pauseBtn">Pause</button>
+            <button id="calcDimBtn">Calculate Dimension</button>
+            <button id="resetBtn">Reset</button>
+            <div id="stats">
+                <div>Active: <span id="activeCount">0</span></div>
+                <div>Stuck: <span id="stuckCount">0</span></div>
+            </div>
+        </div>
+    </div>
+    <div id="instructions">
+        Click and drag to draw boundaries • Particles spawn from center
+    </div>
+
+    <!-- Modal for spawn point clogging -->
+    <div id="modal-overlay">
+        <div id="modal">
+            <h2>⚠️ Spawn Point Clogged!</h2>
+            <p>The spawn point is blocked by boundaries or stuck particles. Particle creation has been paused.</p>
+            <div id="modal-buttons">
+                <button id="relocate-btn">Move Spawn Point</button>
+                <button id="continue-btn" class="secondary">Continue Anyway</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hint for relocation mode -->
+    <div id="relocate-hint">
+        Click anywhere to set new spawn point
+    </div>
+
+    <!-- Modal for fractal dimension results -->
+    <div id="dimension-modal-overlay" style="display: none;">
+        <div id="dimension-modal">
+            <h2>Fractal Dimension</h2>
+            <div id="dimension-results"></div>
+            <canvas id="dimension-plot" width="310" height="240"></canvas>
+            <div style="margin: 10px 0; display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                <button id="prev-box-btn">◄</button>
+                <button id="toggle-boxes-btn">Show Boxes</button>
+                <button id="next-box-btn">►</button>
+            </div>
+            <div id="box-info" style="color: #a8d8ff; font-size: 11px; margin-bottom: 10px;"></div>
+            <button id="close-dimension-btn">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Color scheme - harmonious blues, teals, and corals
+        const COLORS = {
+            background: '#0a0e27',
+            boundary: '#4dd0e1',        // Cyan/teal for user-drawn boundary
+            particle: '#ffd93d',        // Warm yellow for active particles
+            stuck: '#ff6b9d',           // Coral pink for stuck particles
+            boundaryGlow: 'rgba(77, 208, 225, 0.3)',
+            particleGlow: 'rgba(255, 217, 61, 0.4)',
+            stuckGlow: 'rgba(255, 107, 157, 0.4)'
+        };
+
+        // Simulation parameters
+        let particleSpeed = 2.0;
+        let spawnRate = 5;
+        let particles = [];
+        let boundaryPoints = new Set();
+        let stuckParticles = [];
+        let isDrawing = false;
+        let lastSpawnTime = 0;
+        let centerX, centerY;
+        let spawnPaused = false;
+        let isRelocatingSpawn = false;
+        let clogWarningShown = false;
+        let spawnMode = 'center'; // 'center' or 'edge'
+        let isPaused = false;
+        let showBoxes = false;
+        let boxOverlayData = null;
+
+        // Performance limits (based on MacBook capabilities)
+        const MAX_PARTICLES = 5000; // Active particles limit
+        const MAX_STUCK = 10000;    // Stuck particles limit
+
+        // Exponential spawn rate mapping: slider 0-100 -> 1-1000 particles/sec
+        function getSpawnRate(sliderValue) {
+            // Exponential scale: rate = 10^(sliderValue/50)
+            // slider 0 -> 1/sec, slider 50 -> 10/sec, slider 100 -> 1000/sec
+            return Math.pow(10, sliderValue / 50);
+        }
+
+        // Canvas setup
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            centerX = canvas.width / 2;
+            centerY = canvas.height / 2;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Particle class
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 2;
+            }
+
+            update() {
+                // Brownian motion - random walk
+                const angle = Math.random() * Math.PI * 2;
+                const distance = particleSpeed;
+                this.x += Math.cos(angle) * distance;
+                this.y += Math.sin(angle) * distance;
+
+                // Periodic boundary conditions for edge spawn mode
+                if (spawnMode === 'edge') {
+                    if (this.x < 0) this.x += canvas.width;
+                    if (this.x > canvas.width) this.x -= canvas.width;
+                    if (this.y < 0) this.y += canvas.height;
+                    if (this.y > canvas.height) this.y -= canvas.height;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = COLORS.particle;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = COLORS.particleGlow;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            isOffScreen() {
+                return this.x < 0 || this.x > canvas.width ||
+                       this.y < 0 || this.y > canvas.height;
+            }
+
+            checkCollision() {
+                // Check collision with boundary points
+                const checkRadius = 5;
+                for (let key of boundaryPoints) {
+                    const [bx, by] = key.split(',').map(Number);
+                    const dx = this.x - bx;
+                    const dy = this.y - by;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < checkRadius) {
+                        return true;
+                    }
+                }
+
+                // Check collision with stuck particles
+                for (let stuck of stuckParticles) {
+                    const dx = this.x - stuck.x;
+                    const dy = this.y - stuck.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < this.size + stuck.size + 2) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        // Drawing functions
+        function drawBoundary() {
+            if (boundaryPoints.size === 0) return;
+
+            ctx.strokeStyle = COLORS.boundary;
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = COLORS.boundaryGlow;
+
+            for (let key of boundaryPoints) {
+                const [x, y] = key.split(',').map(Number);
+                ctx.fillStyle = COLORS.boundary;
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.shadowBlur = 0;
+        }
+
+        function drawStuckParticles() {
+            for (let particle of stuckParticles) {
+                ctx.fillStyle = COLORS.stuck;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = COLORS.stuckGlow;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+        }
+
+        function addBoundaryPoint(x, y) {
+            const key = `${Math.round(x)},${Math.round(y)}`;
+            boundaryPoints.add(key);
+        }
+
+        // Check if spawn point is clogged
+        function isSpawnPointClogged() {
+            const checkRadius = 20; // Check area around spawn point
+
+            // Check boundaries
+            for (let key of boundaryPoints) {
+                const [bx, by] = key.split(',').map(Number);
+                const dx = centerX - bx;
+                const dy = centerY - by;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < checkRadius) {
+                    return true;
+                }
+            }
+
+            // Check stuck particles
+            for (let stuck of stuckParticles) {
+                const dx = centerX - stuck.x;
+                const dy = centerY - stuck.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < checkRadius) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Show clog warning modal
+        function showClogWarning() {
+            if (clogWarningShown) return;
+            clogWarningShown = true;
+            spawnPaused = true;
+            const overlay = document.getElementById('modal-overlay');
+            overlay.classList.add('active');
+        }
+
+        // Hide modal
+        function hideModal() {
+            const overlay = document.getElementById('modal-overlay');
+            overlay.classList.remove('active');
+        }
+
+        // Draw box-counting overlay
+        function drawBoxOverlay() {
+            if (!showBoxes || !boxOverlayData) return;
+
+            const { minX, minY, boxSize, occupiedBoxes } = boxOverlayData;
+
+            // Draw boxes with vibrant purple and subtle fill
+            for (let boxKey of occupiedBoxes) {
+                const [boxX, boxY] = boxKey.split(',').map(Number);
+                const x = minX + boxX * boxSize;
+                const y = minY + boxY * boxSize;
+
+                // Fill with semi-transparent purple
+                ctx.fillStyle = 'rgba(171, 71, 188, 0.15)';
+                ctx.fillRect(x, y, boxSize, boxSize);
+
+                // Bright purple border
+                ctx.strokeStyle = 'rgba(255, 105, 255, 0.9)'; // Brighter magenta/purple
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, boxSize, boxSize);
+            }
+
+            // Draw info text with background for better visibility
+            const text = `Box size: ${boxSize.toFixed(1)}px  |  Boxes: ${occupiedBoxes.size}`;
+            ctx.font = 'bold 14px Arial';
+            const textMetrics = ctx.measureText(text);
+            const padding = 8;
+
+            // Background
+            ctx.fillStyle = 'rgba(171, 71, 188, 0.85)';
+            ctx.fillRect(5, 5, textMetrics.width + padding * 2, 24);
+
+            // Text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(text, 5 + padding, 22);
+        }
+
+        // Mouse/Touch handling for drawing and relocation
+        function startDrawing(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            // If in relocation mode, set new spawn point
+            if (isRelocatingSpawn) {
+                centerX = x;
+                centerY = y;
+                isRelocatingSpawn = false;
+                canvas.classList.remove('relocate-mode');
+                document.getElementById('relocate-hint').style.display = 'none';
+                spawnPaused = false;
+                clogWarningShown = false;
+                return;
+            }
+
+            // Otherwise, draw boundary
+            isDrawing = true;
+            addBoundaryPoint(x, y);
+        }
+
+        function draw(e) {
+            if (!isDrawing || isRelocatingSpawn) return;
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            // Draw continuous line by filling in points between movements
+            addBoundaryPoint(x, y);
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // Event listeners
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // Spawn particles
+        function spawnParticle() {
+            let x, y;
+
+            if (spawnMode === 'center') {
+                // Add small random offset from exact center
+                const offset = 5;
+                x = centerX + (Math.random() - 0.5) * offset;
+                y = centerY + (Math.random() - 0.5) * offset;
+            } else {
+                // Edge mode: spawn near existing boundaries or stuck particles
+                const spawnDistance = 50; // Distance from target point
+
+                // Collect all potential targets (boundaries and stuck particles)
+                const targets = [];
+
+                // Add boundary points
+                for (let key of boundaryPoints) {
+                    const [bx, by] = key.split(',').map(Number);
+                    targets.push({ x: bx, y: by });
+                }
+
+                // Add stuck particles
+                for (let stuck of stuckParticles) {
+                    targets.push({ x: stuck.x, y: stuck.y });
+                }
+
+                if (targets.length > 0) {
+                    // Pick a random target
+                    const target = targets[Math.floor(Math.random() * targets.length)];
+
+                    // Spawn at random angle around the target
+                    const angle = Math.random() * Math.PI * 2;
+                    x = target.x + Math.cos(angle) * spawnDistance;
+                    y = target.y + Math.sin(angle) * spawnDistance;
+
+                    // Clamp to canvas bounds with periodic wrapping
+                    while (x < 0) x += canvas.width;
+                    while (x > canvas.width) x -= canvas.width;
+                    while (y < 0) y += canvas.height;
+                    while (y > canvas.height) y -= canvas.height;
+                } else {
+                    // No targets yet, spawn from random edge
+                    const edge = Math.floor(Math.random() * 4);
+                    switch(edge) {
+                        case 0: // Top
+                            x = Math.random() * canvas.width;
+                            y = 0;
+                            break;
+                        case 1: // Right
+                            x = canvas.width;
+                            y = Math.random() * canvas.height;
+                            break;
+                        case 2: // Bottom
+                            x = Math.random() * canvas.width;
+                            y = canvas.height;
+                            break;
+                        case 3: // Left
+                            x = 0;
+                            y = Math.random() * canvas.height;
+                            break;
+                    }
+                }
+            }
+
+            particles.push(new Particle(x, y));
+        }
+
+        // Animation loop
+        function animate(timestamp) {
+            // Clear canvas
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw center point (spawn location) only in center mode
+            if (spawnMode === 'center') {
+                ctx.fillStyle = spawnPaused ? 'rgba(255, 107, 107, 0.6)' : 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, spawnPaused ? 6 : 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Check for spawn point clogging only in center mode
+                if (!spawnPaused && !isPaused && isSpawnPointClogged()) {
+                    showClogWarning();
+                }
+            }
+
+            // Spawn particles based on spawn rate (only if not paused and under limit)
+            if (!spawnPaused && !isPaused && particles.length < MAX_PARTICLES && stuckParticles.length < MAX_STUCK) {
+                if (timestamp - lastSpawnTime > 1000 / spawnRate) {
+                    spawnParticle();
+                    lastSpawnTime = timestamp;
+                }
+            }
+
+            // Update and draw particles (only if not paused)
+            if (!isPaused) {
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const particle = particles[i];
+                    particle.update();
+
+                    // Check if particle is off screen (only for center mode)
+                    if (spawnMode === 'center' && particle.isOffScreen()) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+
+                    // Check collision
+                    if (particle.checkCollision()) {
+                        stuckParticles.push(particle);
+                        particles.splice(i, 1);
+                        continue;
+                    }
+
+                    particle.draw();
+                }
+            } else {
+                // Still draw particles when paused
+                for (let particle of particles) {
+                    particle.draw();
+                }
+            }
+
+            // Draw boundary and stuck particles
+            drawBoundary();
+            drawStuckParticles();
+
+            // Draw box overlay if enabled
+            drawBoxOverlay();
+
+            // Update stats
+            document.getElementById('activeCount').textContent = particles.length;
+            document.getElementById('stuckCount').textContent = stuckParticles.length;
+
+            requestAnimationFrame(animate);
+        }
+
+        // Box-counting fractal dimension calculation
+        function calculateFractalDimension() {
+            if (stuckParticles.length < 50) {
+                alert('Need at least 50 stuck particles to calculate dimension');
+                return null;
+            }
+
+            // Find bounding box of stuck particles
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            for (let p of stuckParticles) {
+                minX = Math.min(minX, p.x);
+                maxX = Math.max(maxX, p.x);
+                minY = Math.min(minY, p.y);
+                maxY = Math.max(maxY, p.y);
+            }
+
+            const width = maxX - minX;
+            const height = maxY - minY;
+            const size = Math.max(width, height);
+
+            // Add padding to ensure we have room
+            const paddedSize = size * 1.1;
+
+            // Box sizes to test - use a wider range of scales
+            const boxSizes = [];
+            const counts = [];
+            const allBoxData = []; // Store all box data for visualization
+
+            // Start with larger boxes and go progressively smaller
+            // Test at least 8-12 different scales
+            let currentSize = paddedSize / 4; // Start at size/4
+            const minBoxSize = 4; // Don't go smaller than 4 pixels
+
+            while (currentSize >= minBoxSize && boxSizes.length < 15) {
+                boxSizes.push(currentSize);
+
+                // Count boxes containing at least one particle
+                const occupiedBoxes = new Set();
+                for (let p of stuckParticles) {
+                    const boxX = Math.floor((p.x - minX) / currentSize);
+                    const boxY = Math.floor((p.y - minY) / currentSize);
+                    occupiedBoxes.add(`${boxX},${boxY}`);
+                }
+
+                counts.push(occupiedBoxes.size);
+
+                // Store box data for visualization
+                allBoxData.push({
+                    minX: minX,
+                    minY: minY,
+                    boxSize: currentSize,
+                    occupiedBoxes: occupiedBoxes
+                });
+
+                currentSize = currentSize / 1.5; // Reduce by factor of 1.5
+            }
+
+            // Linear regression on log-log plot
+            // log(N) = D * log(1/boxSize) + C
+            // where D is the fractal dimension
+            const logSizes = boxSizes.map(s => Math.log(1/s));
+            const logCounts = counts.map(c => Math.log(c));
+
+            const n = logSizes.length;
+            const sumX = logSizes.reduce((a, b) => a + b, 0);
+            const sumY = logCounts.reduce((a, b) => a + b, 0);
+            const sumXY = logSizes.reduce((sum, x, i) => sum + x * logCounts[i], 0);
+            const sumX2 = logSizes.reduce((sum, x) => sum + x * x, 0);
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            // Calculate R² for goodness of fit
+            const yMean = sumY / n;
+            const ssTotal = logCounts.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0);
+            const ssResidual = logCounts.reduce((sum, y, i) => {
+                const yPred = slope * logSizes[i] + intercept;
+                return sum + Math.pow(y - yPred, 2);
+            }, 0);
+            const r2 = 1 - (ssResidual / ssTotal);
+
+            return {
+                dimension: slope,
+                r2: r2,
+                boxSizes: boxSizes,
+                counts: counts,
+                logSizes: logSizes,
+                logCounts: logCounts,
+                slope: slope,
+                intercept: intercept,
+                allBoxData: allBoxData
+            };
+        }
+
+        // Draw log-log plot
+        function drawDimensionPlot(result) {
+            const plotCanvas = document.getElementById('dimension-plot');
+            const plotCtx = plotCanvas.getContext('2d');
+            const width = plotCanvas.width;
+            const height = plotCanvas.height;
+
+            // Clear
+            plotCtx.fillStyle = 'white';
+            plotCtx.fillRect(0, 0, width, height);
+
+            // Margins
+            const margin = 50;
+            const plotWidth = width - 2 * margin;
+            const plotHeight = height - 2 * margin;
+
+            // Find data ranges
+            const minX = Math.min(...result.logSizes);
+            const maxX = Math.max(...result.logSizes);
+            const minY = Math.min(...result.logCounts);
+            const maxY = Math.max(...result.logCounts);
+
+            const rangeX = maxX - minX;
+            const rangeY = maxY - minY;
+
+            // Draw axes
+            plotCtx.strokeStyle = '#333';
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+            plotCtx.moveTo(margin, margin);
+            plotCtx.lineTo(margin, height - margin);
+            plotCtx.lineTo(width - margin, height - margin);
+            plotCtx.stroke();
+
+            // Plot data points
+            plotCtx.fillStyle = '#ab47bc';
+            for (let i = 0; i < result.logSizes.length; i++) {
+                const x = margin + ((result.logSizes[i] - minX) / rangeX) * plotWidth;
+                const y = height - margin - ((result.logCounts[i] - minY) / rangeY) * plotHeight;
+                plotCtx.beginPath();
+                plotCtx.arc(x, y, 5, 0, Math.PI * 2);
+                plotCtx.fill();
+            }
+
+            // Draw regression line
+            plotCtx.strokeStyle = '#4dd0e1';
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+            for (let i = 0; i <= 100; i++) {
+                const logSize = minX + (i / 100) * rangeX;
+                const logCount = result.slope * logSize + result.intercept;
+                const x = margin + ((logSize - minX) / rangeX) * plotWidth;
+                const y = height - margin - ((logCount - minY) / rangeY) * plotHeight;
+                if (i === 0) {
+                    plotCtx.moveTo(x, y);
+                } else {
+                    plotCtx.lineTo(x, y);
+                }
+            }
+            plotCtx.stroke();
+
+            // Labels
+            plotCtx.fillStyle = '#333';
+            plotCtx.font = '12px Arial';
+            plotCtx.textAlign = 'center';
+            plotCtx.fillText('log(1/box size)', width / 2, height - 10);
+            plotCtx.save();
+            plotCtx.translate(15, height / 2);
+            plotCtx.rotate(-Math.PI / 2);
+            plotCtx.fillText('log(count)', 0, 0);
+            plotCtx.restore();
+
+            // Title
+            plotCtx.font = 'bold 14px Arial';
+            plotCtx.fillText('Box-Counting Log-Log Plot', width / 2, 20);
+        }
+
+        // Control handlers
+        document.getElementById('spawnCenter').addEventListener('click', () => {
+            spawnMode = 'center';
+            document.getElementById('spawnCenter').classList.add('active');
+            document.getElementById('spawnEdge').classList.remove('active');
+            // Reset clog warning when switching modes
+            spawnPaused = false;
+            clogWarningShown = false;
+            hideModal();
+        });
+
+        document.getElementById('spawnEdge').addEventListener('click', () => {
+            spawnMode = 'edge';
+            document.getElementById('spawnEdge').classList.add('active');
+            document.getElementById('spawnCenter').classList.remove('active');
+            // Reset clog warning when switching modes
+            spawnPaused = false;
+            clogWarningShown = false;
+            hideModal();
+        });
+
+        document.getElementById('speed').addEventListener('input', (e) => {
+            particleSpeed = parseFloat(e.target.value);
+            document.getElementById('speedValue').textContent = particleSpeed.toFixed(1) + 'x';
+        });
+
+        document.getElementById('spawnRate').addEventListener('input', (e) => {
+            const sliderValue = parseInt(e.target.value);
+            spawnRate = getSpawnRate(sliderValue);
+            // Display with appropriate precision
+            if (spawnRate < 10) {
+                document.getElementById('spawnRateValue').textContent = spawnRate.toFixed(1) + '/sec';
+            } else if (spawnRate < 100) {
+                document.getElementById('spawnRateValue').textContent = Math.round(spawnRate) + '/sec';
+            } else {
+                document.getElementById('spawnRateValue').textContent = Math.round(spawnRate) + '/sec';
+            }
+        });
+
+        // Initialize spawn rate display
+        document.getElementById('spawnRate').dispatchEvent(new Event('input'));
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtn');
+            if (isPaused) {
+                btn.textContent = 'Resume';
+                btn.classList.add('paused');
+            } else {
+                btn.textContent = 'Pause';
+                btn.classList.remove('paused');
+            }
+        });
+
+        let currentBoxIndex = 0;
+        let dimensionResult = null;
+
+        document.getElementById('calcDimBtn').addEventListener('click', () => {
+            const result = calculateFractalDimension();
+            if (result) {
+                dimensionResult = result;
+                currentBoxIndex = 0;
+
+                // Show results in modal
+                const resultsDiv = document.getElementById('dimension-results');
+                resultsDiv.innerHTML = `
+                    <p><strong>Fractal Dimension:</strong> ${result.dimension.toFixed(3)}</p>
+                    <p><strong>R² (fit quality):</strong> ${result.r2.toFixed(4)}</p>
+                    <p><strong>Particles analyzed:</strong> ${stuckParticles.length}</p>
+                    <p><strong>Box sizes tested:</strong> ${result.boxSizes.length}</p>
+                    <p style="font-size: 11px; margin-top: 10px;">
+                        Expected DLA dimension ≈ 1.71<br>
+                        ${result.r2 > 0.95 ? 'Excellent fit!' : result.r2 > 0.90 ? 'Good fit' : 'Fair fit - need more particles'}
+                    </p>
+                `;
+
+                // Draw plot
+                drawDimensionPlot(result);
+
+                // Reset box visualization
+                showBoxes = false;
+                boxOverlayData = null;
+                document.getElementById('toggle-boxes-btn').textContent = 'Show Boxes';
+                updateBoxInfo();
+
+                // Show modal
+                document.getElementById('dimension-modal-overlay').classList.add('active');
+            }
+        });
+
+        function updateBoxInfo() {
+            if (!dimensionResult) return;
+            const boxData = dimensionResult.allBoxData[currentBoxIndex];
+            document.getElementById('box-info').textContent =
+                `Scale ${currentBoxIndex + 1}/${dimensionResult.allBoxData.length}`;
+        }
+
+        document.getElementById('toggle-boxes-btn').addEventListener('click', () => {
+            if (!dimensionResult) return;
+
+            showBoxes = !showBoxes;
+            if (showBoxes) {
+                boxOverlayData = dimensionResult.allBoxData[currentBoxIndex];
+                document.getElementById('toggle-boxes-btn').textContent = 'Hide Boxes';
+            } else {
+                boxOverlayData = null;
+                document.getElementById('toggle-boxes-btn').textContent = 'Show Boxes';
+            }
+            updateBoxInfo();
+        });
+
+        document.getElementById('prev-box-btn').addEventListener('click', () => {
+            if (!dimensionResult) return;
+            currentBoxIndex = (currentBoxIndex - 1 + dimensionResult.allBoxData.length) % dimensionResult.allBoxData.length;
+            if (showBoxes) {
+                boxOverlayData = dimensionResult.allBoxData[currentBoxIndex];
+            }
+            updateBoxInfo();
+        });
+
+        document.getElementById('next-box-btn').addEventListener('click', () => {
+            if (!dimensionResult) return;
+            currentBoxIndex = (currentBoxIndex + 1) % dimensionResult.allBoxData.length;
+            if (showBoxes) {
+                boxOverlayData = dimensionResult.allBoxData[currentBoxIndex];
+            }
+            updateBoxInfo();
+        });
+
+        document.getElementById('close-dimension-btn').addEventListener('click', () => {
+            document.getElementById('dimension-modal-overlay').classList.remove('active');
+            showBoxes = false;
+            boxOverlayData = null;
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            particles = [];
+            boundaryPoints.clear();
+            stuckParticles = [];
+            spawnPaused = false;
+            clogWarningShown = false;
+            isPaused = false;
+            document.getElementById('pauseBtn').textContent = 'Pause';
+            document.getElementById('pauseBtn').classList.remove('paused');
+            hideModal();
+        });
+
+        // Modal button handlers
+        document.getElementById('relocate-btn').addEventListener('click', () => {
+            hideModal();
+            isRelocatingSpawn = true;
+            canvas.classList.add('relocate-mode');
+            document.getElementById('relocate-hint').style.display = 'block';
+        });
+
+        document.getElementById('continue-btn').addEventListener('click', () => {
+            hideModal();
+            spawnPaused = false;
+            // Don't reset clogWarningShown so it won't show again
+        });
+
+        // Hide instructions after 5 seconds
+        setTimeout(() => {
+            const instructions = document.getElementById('instructions');
+            instructions.style.transition = 'opacity 0.5s ease';
+            instructions.style.opacity = '0';
+            setTimeout(() => instructions.remove(), 500);
+        }, 5000);
+
+        // Start animation
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
