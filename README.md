@@ -13,14 +13,16 @@ This simulation visualizes how particles undergoing random Brownian motion aggre
 ## Features
 
 - **Interactive Boundary Drawing**: Click and drag to draw freehand boundaries
-- **Real-time Particle Spawning**: Particles continuously emit from the center
+- **Dual Spawn Modes**: Center spawn with clogging detection, or edge spawn with periodic boundaries
+- **Fractal Dimension Analysis**: Built-in box-counting algorithm with interactive visualization
 - **Brownian Motion Physics**: Authentic random walk particle movement
+- **Pause/Resume Control**: Freeze and inspect the simulation at any time
 - **Responsive Design**: Works on desktop and mobile devices
 - **Iframe-Ready**: Optimized for embedding in blog posts and portfolios
 - **Adjustable Parameters**:
-  - Particle speed control
-  - Spawn rate adjustment
-  - One-click reset
+  - Particle speed (0.5x to 10x)
+  - Exponential spawn rate (1-1000 particles/sec)
+  - Performance limits for smooth operation
 
 ## Physics Background
 
@@ -79,10 +81,14 @@ When a diffusing particle comes within a critical distance of an existing bounda
    - Stuck particles become part of the boundary for future collisions
 
 3. **Adjust Parameters**:
-   - **Particle Speed**: Controls how fast particles move (0.5x to 5.0x)
-   - **Spawn Rate**: Controls how many particles spawn per second (1-20/sec)
+   - **Spawn Mode**: Toggle between center and edge spawning
+   - **Particle Speed**: Controls how fast particles move (0.5x to 10x)
+   - **Spawn Rate**: Exponential scale from 1 to 1000 particles/sec
+   - **Pause**: Freeze the simulation to inspect patterns
 
-4. **Reset**: Click the "Reset" button to clear all boundaries and particles
+4. **Calculate Fractal Dimension**: Analyzes stuck particles using box-counting with interactive box visualization
+
+5. **Reset**: Click the "Reset" button to clear all boundaries and particles
 
 ### Tips for Interesting Patterns
 
@@ -253,7 +259,6 @@ Potential enhancements for deeper physics simulation:
 3. **Diffusion Coefficient**: Temperature-dependent particle speed
 4. **Cluster-Cluster Aggregation**: Allow multiple growth centers that can merge
 5. **3D Visualization**: Extend to three-dimensional DLA using WebGL
-6. **Fractal Dimension Calculation**: Real-time computation of aggregate fractal dimension
 
 ## Mathematical Details
 

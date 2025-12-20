@@ -504,7 +504,7 @@
         let particleSpeed = 2.0;
         let spawnRate = 5;
         let particles = [];
-        let boundaryPoints = new Set();
+        let boundaryPoints = [];  // Changed from Set to Array of {x, y} objects
         let stuckParticles = [];
         let isDrawing = false;
         let lastSpawnTime = 0;
@@ -517,15 +517,62 @@
         let showBoxes = false;
         let boxOverlayData = null;
 
-        // Performance limits (based on MacBook capabilities)
-        const MAX_PARTICLES = 5000; // Active particles limit
-        const MAX_STUCK = 10000;    // Stuck particles limit
+        // Performance limits (optimized with spatial hashing)
+        const MAX_PARTICLES = 10000; // Active particles limit (doubled)
+        const MAX_STUCK = 50000;      // Stuck particles limit (5x increase)
 
-        // Exponential spawn rate mapping: slider 0-100 -> 1-1000 particles/sec
+        // Spatial hash grid for fast collision detection
+        const GRID_SIZE = 10; // Grid cell size in pixels
+        let spatialGrid = new Map(); // Map of "x,y" -> array of particles/boundaries
+
+        // Hash function for spatial grid
+        function getGridKey(x, y) {
+            const gx = Math.floor(x / GRID_SIZE);
+            const gy = Math.floor(y / GRID_SIZE);
+            return `${gx},${gy}`;
+        }
+
+        // Get nearby grid cells (current + 8 neighbors)
+        function getNearbyGridKeys(x, y) {
+            const gx = Math.floor(x / GRID_SIZE);
+            const gy = Math.floor(y / GRID_SIZE);
+            const keys = [];
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    keys.push(`${gx + dx},${gy + dy}`);
+                }
+            }
+            return keys;
+        }
+
+        // Rebuild spatial grid (called when stuck particles are added)
+        function rebuildSpatialGrid() {
+            spatialGrid.clear();
+
+            // Add boundaries to grid
+            for (let point of boundaryPoints) {
+                const key = getGridKey(point.x, point.y);
+                if (!spatialGrid.has(key)) {
+                    spatialGrid.set(key, []);
+                }
+                spatialGrid.get(key).push(point);
+            }
+
+            // Add stuck particles to grid
+            for (let particle of stuckParticles) {
+                const key = getGridKey(particle.x, particle.y);
+                if (!spatialGrid.has(key)) {
+                    spatialGrid.set(key, []);
+                }
+                spatialGrid.get(key).push(particle);
+            }
+        }
+
+        // Exponential spawn rate mapping: slider 0-100 -> 1-10000 particles/sec (10x increase!)
         function getSpawnRate(sliderValue) {
-            // Exponential scale: rate = 10^(sliderValue/50)
-            // slider 0 -> 1/sec, slider 50 -> 10/sec, slider 100 -> 1000/sec
-            return Math.pow(10, sliderValue / 50);
+            // Exponential scale: rate = 10^(sliderValue/25)
+            // slider 0 -> 1/sec, slider 25 -> 10/sec, slider 50 -> 100/sec, slider 75 -> 1000/sec, slider 100 -> 10000/sec
+            return Math.pow(10, sliderValue / 25);
         }
 
         // Canvas setup
@@ -563,41 +610,38 @@
                 }
             }
 
-            draw() {
-                ctx.fillStyle = COLORS.particle;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = COLORS.particleGlow;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-
             isOffScreen() {
                 return this.x < 0 || this.x > canvas.width ||
                        this.y < 0 || this.y > canvas.height;
             }
 
             checkCollision() {
-                // Check collision with boundary points
+                // Use spatial hashing for O(1) collision detection
                 const checkRadius = 5;
-                for (let key of boundaryPoints) {
-                    const [bx, by] = key.split(',').map(Number);
-                    const dx = this.x - bx;
-                    const dy = this.y - by;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    if (distance < checkRadius) {
-                        return true;
-                    }
-                }
+                const checkRadiusSq = checkRadius * checkRadius; // Use squared distance
 
-                // Check collision with stuck particles
-                for (let stuck of stuckParticles) {
-                    const dx = this.x - stuck.x;
-                    const dy = this.y - stuck.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    if (distance < this.size + stuck.size + 2) {
-                        return true;
+                // Get nearby grid cells
+                const nearbyKeys = getNearbyGridKeys(this.x, this.y);
+
+                // Only check particles in nearby cells
+                for (let key of nearbyKeys) {
+                    const cellObjects = spatialGrid.get(key);
+                    if (!cellObjects) continue;
+
+                    for (let obj of cellObjects) {
+                        const dx = this.x - obj.x;
+                        const dy = this.y - obj.y;
+                        const distSq = dx * dx + dy * dy;
+
+                        // For boundary points, use fixed checkRadius
+                        // For stuck particles, use size-based collision
+                        const thresholdSq = obj.size !== undefined
+                            ? (this.size + obj.size + 2) * (this.size + obj.size + 2)
+                            : checkRadiusSq;
+
+                        if (distSq < thresholdSq) {
+                            return true;
+                        }
                     }
                 }
 
@@ -605,20 +649,19 @@
             }
         }
 
-        // Drawing functions
+        // Drawing functions - optimized with batching
         function drawBoundary() {
-            if (boundaryPoints.size === 0) return;
+            if (boundaryPoints.length === 0) return;
 
-            ctx.strokeStyle = COLORS.boundary;
-            ctx.lineWidth = 3;
+            // Set style once for all boundary points
+            ctx.fillStyle = COLORS.boundary;
             ctx.shadowBlur = 15;
             ctx.shadowColor = COLORS.boundaryGlow;
 
-            for (let key of boundaryPoints) {
-                const [x, y] = key.split(',').map(Number);
-                ctx.fillStyle = COLORS.boundary;
+            // Batch draw all boundary points
+            for (let point of boundaryPoints) {
                 ctx.beginPath();
-                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -626,44 +669,58 @@
         }
 
         function drawStuckParticles() {
+            if (stuckParticles.length === 0) return;
+
+            // Set style once for all stuck particles
+            ctx.fillStyle = COLORS.stuck;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = COLORS.stuckGlow;
+
+            // Batch draw all stuck particles
             for (let particle of stuckParticles) {
-                ctx.fillStyle = COLORS.stuck;
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = COLORS.stuckGlow;
                 ctx.beginPath();
                 ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
                 ctx.fill();
             }
+
             ctx.shadowBlur = 0;
         }
 
         function addBoundaryPoint(x, y) {
-            const key = `${Math.round(x)},${Math.round(y)}`;
-            boundaryPoints.add(key);
+            const rx = Math.round(x);
+            const ry = Math.round(y);
+
+            // Add as object instead of string
+            const point = { x: rx, y: ry };
+            boundaryPoints.push(point);
+
+            // Add to spatial grid immediately
+            const key = getGridKey(rx, ry);
+            if (!spatialGrid.has(key)) {
+                spatialGrid.set(key, []);
+            }
+            spatialGrid.get(key).push(point);
         }
 
-        // Check if spawn point is clogged
+        // Check if spawn point is clogged (optimized with spatial grid)
         function isSpawnPointClogged() {
-            const checkRadius = 20; // Check area around spawn point
+            const checkRadius = 20;
+            const checkRadiusSq = checkRadius * checkRadius;
 
-            // Check boundaries
-            for (let key of boundaryPoints) {
-                const [bx, by] = key.split(',').map(Number);
-                const dx = centerX - bx;
-                const dy = centerY - by;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < checkRadius) {
-                    return true;
-                }
-            }
+            // Use spatial grid for fast lookup
+            const nearbyKeys = getNearbyGridKeys(centerX, centerY);
 
-            // Check stuck particles
-            for (let stuck of stuckParticles) {
-                const dx = centerX - stuck.x;
-                const dy = centerY - stuck.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < checkRadius) {
-                    return true;
+            for (let key of nearbyKeys) {
+                const cellObjects = spatialGrid.get(key);
+                if (!cellObjects) continue;
+
+                for (let obj of cellObjects) {
+                    const dx = centerX - obj.x;
+                    const dy = centerY - obj.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < checkRadiusSq) {
+                        return true;
+                    }
                 }
             }
 
@@ -783,19 +840,8 @@
                 // Edge mode: spawn near existing boundaries or stuck particles
                 const spawnDistance = 50; // Distance from target point
 
-                // Collect all potential targets (boundaries and stuck particles)
-                const targets = [];
-
-                // Add boundary points
-                for (let key of boundaryPoints) {
-                    const [bx, by] = key.split(',').map(Number);
-                    targets.push({ x: bx, y: by });
-                }
-
-                // Add stuck particles
-                for (let stuck of stuckParticles) {
-                    targets.push({ x: stuck.x, y: stuck.y });
-                }
+                // Collect all potential targets (boundaries already objects!)
+                const targets = [...boundaryPoints, ...stuckParticles];
 
                 if (targets.length > 0) {
                     // Pick a random target
@@ -881,16 +927,33 @@
                     if (particle.checkCollision()) {
                         stuckParticles.push(particle);
                         particles.splice(i, 1);
+
+                        // Add to spatial grid
+                        const key = getGridKey(particle.x, particle.y);
+                        if (!spatialGrid.has(key)) {
+                            spatialGrid.set(key, []);
+                        }
+                        spatialGrid.get(key).push(particle);
+
                         continue;
                     }
 
-                    particle.draw();
                 }
-            } else {
-                // Still draw particles when paused
+            }
+
+            // Batch draw all active particles (set style once)
+            if (particles.length > 0) {
+                ctx.fillStyle = COLORS.particle;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = COLORS.particleGlow;
+
                 for (let particle of particles) {
-                    particle.draw();
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.fill();
                 }
+
+                ctx.shadowBlur = 0;
             }
 
             // Draw boundary and stuck particles
@@ -1216,8 +1279,9 @@
 
         document.getElementById('resetBtn').addEventListener('click', () => {
             particles = [];
-            boundaryPoints.clear();
+            boundaryPoints = [];  // Changed from .clear() to = []
             stuckParticles = [];
+            spatialGrid.clear();  // Clear spatial grid
             spawnPaused = false;
             clogWarningShown = false;
             isPaused = false;
