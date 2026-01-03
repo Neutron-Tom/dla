@@ -1171,13 +1171,17 @@
         document.getElementById('spawnRate').addEventListener('input', (e) => {
             const sliderValue = parseInt(e.target.value);
             spawnRate = getSpawnRate(sliderValue);
-            // Display with appropriate precision
-            if (spawnRate < 10) {
-                document.getElementById('spawnRateValue').textContent = spawnRate.toFixed(1) + '/sec';
-            } else if (spawnRate < 100) {
-                document.getElementById('spawnRateValue').textContent = Math.round(spawnRate) + '/sec';
+            // Display Low to High instead of numbers
+            if (sliderValue <= 20) {
+                document.getElementById('spawnRateValue').textContent = 'Low';
+            } else if (sliderValue <= 40) {
+                document.getElementById('spawnRateValue').textContent = 'Medium-Low';
+            } else if (sliderValue <= 60) {
+                document.getElementById('spawnRateValue').textContent = 'Medium';
+            } else if (sliderValue <= 80) {
+                document.getElementById('spawnRateValue').textContent = 'Medium-High';
             } else {
-                document.getElementById('spawnRateValue').textContent = Math.round(spawnRate) + '/sec';
+                document.getElementById('spawnRateValue').textContent = 'High';
             }
         });
 
